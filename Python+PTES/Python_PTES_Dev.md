@@ -1466,5 +1466,12 @@ conn.close()
 
 # 无线网络渗透
 
+```python
+无线网络的组建方式有两种，Ad-hoc和Infrastructure
+Ad-hoc:带有无线设备的计算机之间之间进行通信(类似有线网络的双机互联)
+Infrastructure:无线网与有线网通过一接入点来进行通信，这个接入点被称为AP(Access Point)
 
+在Infrastructure模式下，AP以极快的速度向外发送Beacon帧，以向外界声明自身的存在
+Beacon帧中
+```
 
